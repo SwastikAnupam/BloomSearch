@@ -22,7 +22,8 @@ class SpiderSearch:
             return
 
         try:
-            response = requests.get(url, timeout=10)
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+            response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
         except (RequestException, Timeout, ConnectionError, HTTPError) as e:
             print(f"Error crawling {url}: {e}")
@@ -45,21 +46,9 @@ class SpiderSearch:
         elif 'csv' in content_type:
             parser = 'csv'
             page_data = self.process_csv(url, response.text)
-        elif 'javascript' in content_type:
-            parser = 'javascript'
-            page_data = self.process_javascript(url, response.text)
-        elif 'pdf' in content_type:
-            parser = 'pdf'
-            page_data = self.process_pdf(url, response.content)
-        elif 'text/plain' in content_type:
-            parser = 'text'
-            page_data = self.process_text(url, response.text)
-        elif 'image' in content_type:
-            parser = 'image'
-            page_data = self.process_image(url, response.content)
         else:
             parser = 'unknown'
-            page_data = {'Parser': 'Unknown', 'URL': url}
+            page_data = {'Parser': parser, 'URL': url}
 
         self.data.append(page_data)
         self.visited.add(url)
@@ -81,13 +70,13 @@ class SpiderSearch:
     def process_xml(self, url, root):
         # Implement XML-specific processing here
         # For example, extract data from an XML document
-        return {'Parser': 'lxml', 'URL': url}
+        return {'Parser': 'XML', 'URL': url}
 
     def process_rss(self, url, rss_content):
         # Implement RSS-specific processing here
         feed = feedparser.parse(rss_content)
         entries = [{'Title': entry.title, 'Link': entry.link} for entry in feed.entries]
-        return {'Parser': 'feedparser', 'Entries': entries, 'URL': url}
+        return {'Parser': 'RSS', 'Entries': entries, 'URL': url}
 
     def process_csv(self, url, csv_content):
         # Implement CSV-specific processing here
@@ -95,33 +84,19 @@ class SpiderSearch:
         data = [row for row in reader]
         return {'Parser': 'CSV', 'Data': data, 'URL': url}
 
-    def process_javascript(self, url, js_content):
-        # Implement JavaScript-specific processing here
-        # This is a placeholder and may require more advanced techniques
-        return {'Parser': 'JavaScript', 'URL': url}
-
-    def process_pdf(self, url, pdf_content):
-        return {'Parser': 'PDF', 'URL': url}
-
-    def process_text(self, url, text_content):
-        return {'Parser': 'Plain Text', 'Content': text_content, 'URL': url}
-
-    def process_image(self, url, image_content):
-        # Implement image processing here
-        # This is a placeholder and may require specialized libraries
-        return {'Parser': 'Image', 'URL': url}
-
     def extract_links(self, html_content):
         # Extract links from HTML content
         # Customize this method for specific link extraction logic
         soup = BeautifulSoup(html_content, 'html.parser')
-        links = [link.get('href') for link in soup.find_all('a')]
+        links = []
+        for link in soup.find_all('a', href=True):
+            links.append(link['href'])
         return links
 
     def save_to_csv(self, filename):
         # Save the collected data to a CSV file
         with open(filename, mode='w', newline='', encoding='utf-8') as csv_file:
-            fieldnames = ['Parser', 'Title', 'Data', 'Entries', 'Content', 'Link', 'URL']
+            fieldnames = ['Parser', 'Title', 'Data', 'Entries', 'URL']
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
             writer.writeheader()
             for page_data in self.data:
@@ -133,7 +108,7 @@ class SpiderSearch:
                 executor.submit(self.crawl, start_url)
 
 if __name__ == "__main__":
-    start_urls = ["https://amity.edu/kolkata/"]  # enter urls to start searching websites linked
+    start_urls = ["https://www.bbc.com/news"]  # Enter URLs to start searching websites linked
     spider = SpiderSearch(start_urls, max_depth=3, max_threads=10)
     spider.run()
     spider.save_to_csv("web_data.csv")
